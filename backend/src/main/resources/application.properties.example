@@ -1,0 +1,9 @@
+# PostgreSQL connection
+database.url=jdbc:postgresql://localhost:5432/civiclink
+database.username=postgres
+database.password=${CIVICLINK_DB_PASSWORD:}
+
+# Set PUBLICDATA_SERVICE_KEY in your environment before starting the server.
+publicdata.service-key=${PUBLICDATA_SERVICE_KEY:}
+publicdata.complaint.list-url=https://apis.data.go.kr/1140100/ApiDiciService/selectApiDiciList
+publicdata.complaint.detail-url=https://apis.data.go.kr/1140100/ApiDiciService/selectApiDiciDetail

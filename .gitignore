@@ -1,0 +1,33 @@
+# Local configuration and secrets
+.codex/
+.env
+.env.*
+!.env.example
+!.env.sample
+/backend/src/main/resources/application.properties
+
+# Gradle caches and generated backend files
+.gradle/
+.gradle-user/
+/backend/build/
+/backend/out/
+
+# Frontend dependencies and generated files
+node_modules/
+/frontend/dist/
+coverage/
+*.log
+
+# Local database, collected documents, and search indexes
+/backend/data/
+
+# IntelliJ IDEA local project settings
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini

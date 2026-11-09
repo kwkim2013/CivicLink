@@ -1,0 +1,6 @@
+{
+  "prompt": "Use case: precise-object-edit / ui-mockup. Image 1 is the edit target: the Korean 회원가입 screen. Make ONLY this focused correction: simplify the top header to the product title \"공공민원 AI 업무지원 시스템\" and the existing small demo badge. REMOVE the far-left hamburger menu and its vertical separator. REMOVE the top global complaint search field and blue search button entirely, restoring a plain white header in that area. Place the title at the same comfortable left margin as a logged-out login screen. No navigation, user menu, or search should appear before login. Preserve the complete registration form, its exact Korean labels, field values, consent checkboxes, buttons, form alignment, background, colors, typography and screenshot dimensions. Do not redraw or add other panels. Output one crisp flat UI screenshot, full canvas, no crop, no watermark.",
+  "reference": "C:\\Users\\AISW_203_102\\.codex\\generated_images\\01a1758c-c015-7011-9a5e-de0df1b92b82\\exec-f6bb33fb-9b96-450f-979b-d66138cb989e.png",
+  "final_file": "02-signup-v2.png",
+  "generation_mode": "built-in image_gen"
+}

@@ -1,0 +1,24 @@
+.complaint-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+.item-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.small-button {
+  border: 1px solid #d5deea;
+  background: #fff;
+  color: #52647d;
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.small-button.danger:hover {
+  border-color: #c44;
+  color: #c44;
+}

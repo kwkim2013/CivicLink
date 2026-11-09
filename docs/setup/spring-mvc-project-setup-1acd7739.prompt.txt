@@ -1,0 +1,34 @@
+Mode: built-in image_gen
+
+Use case: precise-object-edit.
+Image 1 is the EDIT TARGET: the user's real 787x742 IntelliJ Java New Project dialog. Annotate the screenshot with accurate RECTANGULAR BOXES to tell a beginner how to create a plain Gradle Java project, later configured for Spring MVC.
+
+Preserve the entire original screenshot on the left, its UI content and current field values, selected Java and Gradle controls. Do not invent new fields or change the actual screenshot values. Extend the canvas to the RIGHT with a 400px white instruction margin. Preserve the screenshot proportions, full dialog and bottom buttons, no cropping. High legibility and sharp screenshot text.
+
+Draw thin bright-red 3px RECTANGULAR outlines around the following exact controls, with small matching numbered square labels placed just outside the outlined area and not obscuring text. Coordinates refer to the ORIGINAL screenshot:
+1. Name text input, x359 y74 to x635 y102 (currently "untitled").
+2. Location text input, x359 y122 to x767 y150 (currently D:\IntelliJProject).
+3. Only the "Gradle" build-system button, x493 y220 to x560 y248.
+4. JDK selector, x359 y267 to x767 y296 (installed Microsoft OpenJDK 17).
+5. Only the "Groovy" button in the Gradle DSL row, x424 y316 to x495 y344. This is the desired button, even though Kotlin is selected in the source screenshot. Do not outline the left sidebar's separate Groovy language option.
+6. "샘플 코드 추가" checkbox and label, x263 y364 to x388 y383. Current checkbox is checked; the note should instruct the user to uncheck it.
+7. Bottom blue "생성(C)" button, x612 y705 to x686 y735.
+Use just rectangle outlines and number badges, no long arrows crossing other controls.
+
+In the right white margin create a practical, clean numbered legend. Dark navy/black Korean sans-serif, red number squares matching the screenshot, generous readable spacing. Exact text:
+"Spring MVC 프로젝트 준비"
+"아래 항목을 설정하세요."
+"1  이름: backend"
+"2  위치: D:\CivicLink"
+"   최종 생성 경로:"
+"   D:\CivicLink\backend"
+"3  빌드 시스템: Gradle"
+"4  JDK: 현재 설치된 17 유지"
+"5  Gradle DSL: Groovy"
+"6  샘플 코드 추가: 체크 해제"
+"7  생성 버튼 클릭"
+At the bottom, separate with a thin gray rule and show:
+"생성 후 Spring MVC 의존성과"
+"웹 설정을 추가합니다."
+
+Important technical accuracy: the Location field is the parent folder; with Name=backend and Location=D:\CivicLink the resulting project folder is D:\CivicLink\backend. Keep these distinct. This creates a base Java project and does not automatically install Spring. No fabricated live app state, no extra logo or watermark.

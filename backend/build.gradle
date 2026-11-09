@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'war'
+}
+
+group = 'com.civiclink'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework:spring-webmvc:5.3.39'
+    implementation 'org.springframework:spring-context:5.3.39'
+    implementation 'org.thymeleaf:thymeleaf-spring5:3.1.2.RELEASE'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.4'
+    implementation 'org.springframework:spring-jdbc:5.3.39'
+    runtimeOnly 'org.postgresql:postgresql:42.7.7'
+    runtimeOnly 'org.slf4j:slf4j-jdk14:2.0.7'
+    implementation 'com.h2database:h2:2.3.232'
+
+    compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
+
+    testImplementation 'org.springframework:spring-test:5.3.39'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
+    testImplementation 'javax.servlet:javax.servlet-api:4.0.1'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// Keep IntelliJ's deployment directory up to date when building the WAR.
+tasks.register('refreshExplodedWar', Copy) {
+    dependsOn tasks.named('war')
+    from { zipTree(tasks.named('war').get().archiveFile.get().asFile) }
+    into layout.buildDirectory.dir('libs/exploded/backend-1.0.0.war')
+}
+tasks.named('war') {
+    finalizedBy tasks.named('refreshExplodedWar')
+}

@@ -1,0 +1,115 @@
+@baseUrl = http://localhost:8080
+@docMngNo = 931
+
+@username = demo-user
+@password = ChangeThisDemoPassword123!
+
+### 1. CSRF 토큰 발급 (요청 실행 후 쿠키 저장을 허용하세요)
+GET {{baseUrl}}/api/auth/csrf
+Accept: application/json
+
+> {% client.global.set("csrfToken", response.body.csrfToken); %}
+
+### 2. 회원가입 (최초 1회, 이미 존재하면 409)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+Accept: application/json
+X-CSRF-Token: {{csrfToken}}
+
+{"username":"{{username}}","password":"{{password}}"}
+
+### 3. 로그인 (로그인 후 CSRF 토큰 갱신)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+Accept: application/json
+X-CSRF-Token: {{csrfToken}}
+
+{"username":"{{username}}","password":"{{password}}"}
+
+> {% client.global.set("csrfToken", response.body.csrfToken); %}
+
+### 로그인 세션 확인
+GET {{baseUrl}}/api/auth/me
+Accept: application/json
+
+### RAG 업무지원 답변 생성 (qwen3:4b 필요)
+POST {{baseUrl}}/api/ai/answer
+Content-Type: application/json
+X-CSRF-Token: {{csrfToken}}
+
+{"content":"횡단보도 경계석이 높아 휠체어로 이동하기 어렵습니다. 개선이 필요합니다."}
+
+### 민원 자동분류 추천
+POST {{baseUrl}}/api/ai/classify
+Content-Type: application/json
+X-CSRF-Token: {{csrfToken}}
+
+{"content":"횡단보도 경계석이 높아 휠체어로 이동하기 어렵습니다."}
+
+### 내 민원 등록 (상태는 서버에서 RECEIVED로 지정)
+POST {{baseUrl}}/api/complaints
+Content-Type: application/json
+X-CSRF-Token: {{csrfToken}}
+
+{"title":"횡단보도 개선 요청","content":"휠체어로 통행하기 어렵습니다.","category":"교통도로민원"}
+
+> {% client.global.set("complaintId", response.body.id); %}
+
+### 내 민원 목록 (최대 100건)
+GET {{baseUrl}}/api/complaints
+
+### 결정례 30건 수집 - 1페이지
+POST {{baseUrl}}/api/decisions/collect?pageNo=1&numOfRows=10&reqFrom=20000101&reqTo=20261231&search=
+X-CSRF-Token: {{csrfToken}}
+Accept: application/json
+
+### 결정례 30건 수집 - 2페이지
+POST {{baseUrl}}/api/decisions/collect?pageNo=2&numOfRows=10&reqFrom=20000101&reqTo=20261231&search=
+X-CSRF-Token: {{csrfToken}}
+Accept: application/json
+
+### 결정례 30건 수집 - 3페이지
+POST {{baseUrl}}/api/decisions/collect?pageNo=3&numOfRows=10&reqFrom=20000101&reqTo=20261231&search=
+X-CSRF-Token: {{csrfToken}}
+Accept: application/json
+
+### 내 민원 수정
+PUT {{baseUrl}}/api/complaints/{{complaintId}}
+Content-Type: application/json
+X-CSRF-Token: {{csrfToken}}
+
+{"title":"횡단보도 개선 요청","content":"경계석 높이 개선을 요청합니다.","category":"교통도로민원"}
+
+### 임베딩 인덱스 생성 (관리자 로그인 필요, Ollama 실행 및 bge-m3 다운로드 필요)
+POST {{baseUrl}}/api/decisions/index
+X-CSRF-Token: {{csrfToken}}
+Accept: application/json
+
+### 유사 결정례 검색 (인덱스 생성 후 실행)
+POST {{baseUrl}}/api/decisions/search
+X-CSRF-Token: {{csrfToken}}
+Content-Type: application/json
+
+{
+  "query": "보행자가 안전하게 길을 건너도록 횡단보도를 설치해 주세요.",
+  "topK": 3
+}
+
+### 목록 1페이지에서 최대 10건 수집 (관리자 전용, 저장된 문서는 건너뜀)
+# NO_CONTENTS가 나오면 목록 조회에 성공했던 기간으로 변경하세요.
+POST {{baseUrl}}/api/decisions/collect?pageNo=1&numOfRows=10&reqFrom=20000101&reqTo=20221231
+X-CSRF-Token: {{csrfToken}}
+Accept: application/json
+
+### 결정례 상세 수집 및 DB 저장 (관리자 전용)
+POST {{baseUrl}}/api/decisions/{{docMngNo}}/collect?category=%EA%B2%BD%EC%B0%B0%EB%AF%BC%EC%9B%90
+X-CSRF-Token: {{csrfToken}}
+Accept: application/json
+
+### 저장된 결정례 조회 (위 POST 요청 성공 후 실행)
+GET {{baseUrl}}/api/decisions/{{docMngNo}}
+Accept: application/json
+
+### 외부 API의 결정례 상세 응답 확인 (저장하지 않음)
+GET {{baseUrl}}/api/public-data/complaints/detail?docMngNo={{docMngNo}}
+Accept: application/json
