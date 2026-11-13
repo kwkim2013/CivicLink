@@ -54,6 +54,101 @@ React / Vite → Spring MVC API → PostgreSQL
                     └─ Ollama → 임베딩 검색 · 분류 · 답변 생성
 ```
 
+## 시스템 아키텍처
+
+![CivicLink 프론트엔드·백엔드 시스템 아키텍처](docs/architecture/civiclink-architecture.png)
+
+[아키텍처 이미지 원본](docs/architecture/civiclink-architecture.png)
+
+로컬 실행 환경을 기준으로 React 화면, Tomcat에서 실행되는 Spring MVC 서버, PostgreSQL, Ollama를 연결한 구조입니다. 브라우저에서 실행되는 React가 사용자 입력과 화면 표시를 담당하고, 백엔드는 인증·권한 확인과 데이터 저장, 외부 API 호출, AI 요청을 처리합니다. 이미지의 웹 브라우저와 React는 화면 실행 환경과 UI 구현 기술을 구분해서 표현한 것입니다.
+
+### 구성 요소와 역할
+
+| 구성 요소 | 역할 및 구현 내용 |
+| --- | --- |
+| React · JavaScript · CSS | 대시보드, 민원 관리, 결정례 검색, AI 분석, 회원 정보 화면을 구성합니다. 공통 API 클라이언트에서 JSON 요청과 오류 처리를 담당합니다. |
+| Vite | 프론트엔드 개발 서버와 빌드를 담당합니다. 로컬 개발 시 `/api` 요청을 Tomcat으로 전달하는 프록시를 사용합니다. |
+| Java · Spring MVC · Apache Tomcat | HTTP 요청을 받아 민원·회원·결정례 API를 실행합니다. 백엔드는 Gradle로 WAR 파일을 빌드한 뒤 Tomcat에 배포합니다. |
+| Spring JDBC · PostgreSQL | `JdbcTemplate`으로 회원, 민원, 결정례 데이터를 읽고 저장합니다. 회원과 민원은 외래 키로 연결하고, 결정례는 별도 테이블에서 관리합니다. |
+| 파일 기반 검색 인덱스 | `search-index.json`에 문서번호, 검색 대상 텍스트, 임베딩 벡터, 모델명을 저장합니다. 백엔드가 검색어 벡터와 저장된 벡터의 코사인 유사도를 계산합니다. |
+| Ollama | 로컬에서 AI 모델을 실행합니다. `bge-m3`는 문서와 검색어의 임베딩을 생성하고, `qwen3:4b`는 민원 분류 추천과 답변 초안을 생성합니다. |
+| 공공데이터포털 API | 검색과 답변의 근거로 사용할 결정례를 수집하는 외부 데이터 소스입니다. 수집 요청은 관리자 권한을 확인한 뒤 백엔드에서 처리합니다. |
+| Git · GitHub | 소스코드와 문서의 변경 이력을 관리합니다. 그림의 Gradle → WAR → Tomcat은 빌드·배포 과정을 나타내며, 자동 배포 파이프라인을 의미하지 않습니다. |
+
+### 민원 관리와 인증 흐름
+
+1. 사용자가 React 화면에서 로그인하면 서버가 로그인 상태를 세션에 저장합니다. 이후 API 요청에는 세션 쿠키를 포함합니다.
+2. 등록·수정·삭제와 같은 변경 요청에는 `X-CSRF-Token` 헤더를 전달하고, 서버가 세션에 저장된 토큰과 비교합니다.
+3. 백엔드는 로그인 사용자와 권한을 확인합니다. 일반 사용자의 민원 조회·수정·삭제에는 소유자 조건을 적용하고, 관리자는 전체 민원을 관리할 수 있습니다.
+4. Spring JDBC로 PostgreSQL에 작업 결과를 반영한 뒤 JSON 응답을 반환하고, 프론트엔드가 화면에 반영합니다.
+
+### 결정례 수집과 AI 처리 흐름
+
+검색 준비와 실제 민원 분석은 다음 순서로 진행됩니다.
+
+1. **결정례 수집:** 관리자가 수집 API를 호출하면 공공데이터포털에서 결정례를 받아 DB에 저장합니다. 문서번호, 제목, 분류와 함께 정규화된 상세 데이터를 보관합니다.
+2. **인덱스 생성:** 결정례의 제목과 신청취지를 `bge-m3`에 전달하여 임베딩을 생성하고 파일 인덱스에 저장합니다. 신청취지가 비어 있는 문서는 인덱싱에서 제외합니다.
+3. **유사 사례 검색:** 사용자의 민원 내용을 같은 모델로 임베딩한 뒤 코사인 유사도를 계산해 관련 결정례를 찾습니다. 유사도 계산은 Ollama가 아닌 백엔드에서 수행합니다.
+4. **분류·답변 생성:** AI 서비스는 검색 결과 상위 3건 중 설정된 유사도 기준을 충족한 사례를 활용합니다. 분류는 수집된 결정례의 분류 목록 안에서 추천하고, 답변 초안은 제공된 사례를 근거로 작성하도록 요청합니다.
+5. **근거 검증과 사용자 검토:** 답변에 반환된 문서번호가 검색 결과에 포함되는지 확인합니다. 관련 사례가 부족하면 검토 필요로 안내하고, 생성 결과와 참고 결정례를 담당자가 확인하도록 제공합니다.
+
+인덱스에는 생성에 사용한 모델과 원문이 함께 저장됩니다. 검색 시 모델명, 기존 문서의 검색 대상 텍스트 또는 벡터 차원이 달라진 것이 확인되면 재생성을 안내합니다. 새 결정례를 수집한 경우에도 검색에 반영하려면 인덱스를 다시 생성해야 합니다.
+
+## 데이터베이스 설계 (ERD)
+
+![CivicLink 회원·민원·결정례 ERD](docs/architecture/civiclink-erd.png)
+
+[ERD 이미지 원본](docs/architecture/civiclink-erd.png) · [PostgreSQL 스키마 SQL](backend/schema.sql)
+
+데이터베이스는 회원 정보를 담는 `app_users`, 사용자가 등록한 민원을 담는 `complaints`, 공공데이터에서 수집한 사례를 담는 `decisions`로 구성됩니다. 아래 설명은 ERD와 현재 테이블 생성 코드를 기준으로 작성했습니다.
+
+### 1. app_users — 회원 및 권한
+
+| 컬럼 | 자료형 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | PK, 자동 생성 | 회원 식별자입니다. 민원 테이블에서 작성자를 참조할 때 사용합니다. |
+| `username` | VARCHAR(100) | NOT NULL, UNIQUE | 로그인 아이디이며 중복 가입을 방지합니다. |
+| `password_hash` | VARCHAR(500) | NOT NULL | PBKDF2-HMAC-SHA256으로 처리한 비밀번호 해시를 저장합니다. |
+| `organization` | VARCHAR(200) | NULL 허용 | 사용자 소속 기관입니다. |
+| `department` | VARCHAR(200) | NULL 허용 | 사용자 소속 부서입니다. |
+| `display_name` | VARCHAR(100) | NULL 허용 | 화면에 표시할 사용자 이름입니다. |
+| `role` | VARCHAR(20) | NOT NULL | `USER`, `ADMIN` 등 애플리케이션 접근 권한을 구분합니다. |
+
+계정 식별·인증 정보와 프로필 정보를 한 테이블에서 관리합니다. 기관·부서·표시 이름은 선택 정보로 두고, API 접근 범위는 로그인 세션의 권한을 바탕으로 판단합니다.
+
+### 2. complaints — 사용자 민원
+
+| 컬럼 | 자료형 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | PK, 자동 생성 | 민원 식별자입니다. |
+| `owner_id` | BIGINT | NOT NULL, FK → `app_users.id` | 민원을 등록한 회원의 식별자입니다. |
+| `title` | VARCHAR(300) | NOT NULL | 민원 제목입니다. |
+| `content` | TEXT | NOT NULL | 민원 본문이며 AI 분석 시 입력 자료로 사용합니다. |
+| `category` | VARCHAR(100) | NULL 허용 | 민원 분류입니다. AI 추천을 검토한 뒤 반영할 수 있습니다. |
+| `status` | VARCHAR(30) | NOT NULL | 민원 상태입니다. 현재 등록 로직은 `RECEIVED`로 저장합니다. |
+
+민원을 생성할 때 `owner_id`는 로그인 사용자 정보에서 설정합니다. 일반 사용자에게는 해당 소유자의 민원만 조회되도록 조건을 적용하며, 수정·삭제에도 같은 소유자 조건을 사용합니다. 현재 수정 API는 제목·본문·분류를 변경하며, 별도의 상태 전환 이력 테이블은 없습니다.
+
+### 3. decisions — 수집된 결정례
+
+| 컬럼 | 자료형 | 제약 조건 | 설명 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | PK | 수집된 결정례의 문서번호를 사용합니다. 자동 증가 식별자가 아닙니다. |
+| `title` | VARCHAR(1000) | NULL 허용 | 결정례 제목입니다. |
+| `category` | VARCHAR(100) | NULL 허용 | 결정례 분류이며 AI 분류 후보를 구성할 때 사용합니다. |
+| `payload` | TEXT | NOT NULL | 정규화한 결정례 객체를 JSON 문자열로 직렬화한 상세 데이터입니다. |
+
+`payload`에는 문서번호, 제목, 분류 외에도 결정일, 신청취지, 결정내용, 원문 URL, 수집 시각, 원본 API 응답 등의 필드를 담습니다. 현재 구현은 상세 조회와 검색 인덱스 생성 시 이 JSON을 읽어 결정례 객체로 복원합니다. DB의 JSON 전용 자료형이 아닌 `TEXT` 컬럼을 사용합니다.
+
+### 테이블 관계와 검색 데이터의 구분
+
+- **회원과 민원은 1:N 관계입니다.** 한 회원은 민원을 등록하지 않거나 여러 건 등록할 수 있고, 각 민원은 반드시 한 회원을 참조합니다. `complaints.owner_id` 외래 키가 존재하지 않는 회원을 참조하는 것을 방지합니다.
+- **결정례는 공통 참고 자료입니다.** 특정 회원이나 민원에 종속되지 않으므로 `decisions`와 다른 테이블 사이에 직접적인 외래 키는 없습니다. 민원과 관련된 결정례는 분석 시 유사도 검색으로 찾습니다.
+- **임베딩은 파일에서 관리합니다.** `decisions`에는 결정례 데이터를 저장하고, 검색용 벡터는 `search-index.json`에 저장합니다. 따라서 ERD에는 벡터 저장 테이블이 표시되지 않습니다.
+- **AI 생성 결과는 별도 이력 테이블에 저장하지 않습니다.** 분류 추천과 답변 초안은 API 응답으로 제공하고, 사용자가 적용한 분류는 민원의 `category`에 반영합니다.
+
+테이블 생성은 [DatabaseConfig.java](backend/src/main/java/com/civiclink/config/DatabaseConfig.java)에서도 수행합니다. [schema.sql](backend/schema.sql)은 별도로 실행 가능한 PostgreSQL 스키마이며, `username`의 UNIQUE 제약과 조회용 인덱스 등 ERD 이미지에 모두 드러나지 않는 정의를 확인할 수 있습니다. SQL 파일의 기본값·추가 인덱스와 애플리케이션 시작 시 생성되는 정의에는 차이가 있으므로 실제 DB 구성 시 함께 확인해야 합니다.
+
 ## 로컬 실행
 
 아래 명령은 프로젝트 루트에서 시작하는 Windows PowerShell 기준입니다. Java와 Node.js/npm, PostgreSQL, WAR를 실행할 Servlet 컨테이너를 준비합니다. 백엔드는 `javax.servlet` 기반이므로 해당 API와 호환되는 Tomcat 환경을 사용합니다.
@@ -148,7 +243,9 @@ CivicLink/
 │  └─ src/
 │     ├─ api/           # API 요청과 CSRF 처리
 │     └─ components/    # 업무 화면 및 공통 UI
-└─ docs/ui/             # 화면 설계와 PNG 이미지
+└─ docs/
+   ├─ architecture/     # 시스템 아키텍처와 ERD 이미지
+   └─ ui/               # 화면 설계와 PNG 이미지
 ```
 
 ## 검증 명령
@@ -179,6 +276,9 @@ cd ..
 
 ## 관련 자료
 
+- [시스템 아키텍처 이미지](docs/architecture/civiclink-architecture.png)
+- [ERD 이미지](docs/architecture/civiclink-erd.png)
+- [PostgreSQL 스키마 SQL](backend/schema.sql)
 - [프론트엔드 안내](frontend/README.md)
 - [백엔드 API 문서](backend/BACKEND-API.md)
 - [임베딩 설정 문서](backend/EMBEDDING-SETUP.md)
